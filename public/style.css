@@ -15,7 +15,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    width: 90%;
+    width: 100%;
     max-width: 440px;
     position: relative;
 }
@@ -30,7 +30,7 @@ h1 {
 .container {
     border: 1px solid #ccc;
     padding: 20px;
-    width: 90%;
+    width: 100%;
     max-width: 400px;
     box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
     display: flex;
@@ -39,7 +39,7 @@ h1 {
 }
 
 .gamecontainer {
-    padding: 20px;
+    padding-bottom: 20px;
     width: 100%;
     max-width: 200px;
     display: flex;
@@ -54,6 +54,15 @@ h1 {
     max-width: 400px;
     box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
     text-align: left;
+}
+
+.name {
+    border-radius: 0;
+    padding: 9px;
+    font-size: 16px;
+    margin: 10px 5px;
+    border-radius: 5px;
+    border: none;
 }
 
 .button {
@@ -87,7 +96,7 @@ h1 {
     justify-content: center;
     align-items: center;
     cursor: pointer;
-    transition: background-color 0.3s;
+    transition: background-color 0.1s;
 }
 
 .grid-item.correct {

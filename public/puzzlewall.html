@@ -18,7 +18,7 @@
     </header>
 
     <div class="container">
-        <p>Um den vollständigen Inhalt zu lesen, lösen Sie bitte das folgende Puzzle:</p>
+        <h4>Solve the following puzzle:</h4>
         <div class="gamecontainer">
             <div class="grid" id="grid">
                 <div class="grid-item" onclick="selectItem(1)"></div>
@@ -34,8 +34,8 @@
         </div>
         <div id="message" class="message"></div>
         <div id="input-section" class="hidden">
-            <input type="text" id="name" placeholder="Geben Sie Ihren Namen ein">
-            <button class="button" id="submit-button" onclick="submitScore()">Punktestand einreichen</button>
+            <input type="text" class="name" id="name" placeholder="your name">
+            <button class="button" id="submit-button" onclick="submitScore()">Submit Score</button>
         </div>
         <div id="continue-section" class="hidden">
             <button class="button" onclick="continueToContent()">Weiter zum Inhalt</button>
