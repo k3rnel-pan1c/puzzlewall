@@ -4,6 +4,7 @@ const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const http = require('http');
 const socketIo = require('socket.io');
+const crypto = require('crypto');
 
 const app = express();
 const server = http.createServer(app);
@@ -29,15 +30,16 @@ let startTimes = {};
 io.on('connection', (socket) => {
     socket.on('start-puzzle', () => {
         const sequence = generateSequence();
-        sequences[socket.id] = sequence;
+        sequences[socket.id] = sequence.map(num => hashNum(num.toString()));
         startTimes[socket.id] = new Date().getTime();
-        socket.emit('start-puzzle', sequence);
+        socket.emit('start-puzzle', sequences[socket.id]);
     });
 
     socket.on('end-puzzle', (userSequence) => {
         const endTime = new Date().getTime();
         const correctSequence = sequences[socket.id];
-        if (JSON.stringify(correctSequence) === JSON.stringify(userSequence)) {
+        const hashedUserSequence = userSequence.map(num => hashNum(num.toString()));
+        if (JSON.stringify(correctSequence) === JSON.stringify(hashedUserSequence)) {
             const timeTaken = (endTime - startTimes[socket.id]) / 1000;
             socket.emit('puzzle-solved', timeTaken);
         } else {
@@ -111,6 +113,10 @@ function generateSequence() {
     return sequence;
 }
 
+function hashNum(input) {
+    return crypto.createHash('sha256').update(input.toString()).digest('hex');
+}
+
 app.get('/leaderboard', (req, res) => {
     const isMobile = req.query.isMobile === 'true';
     const db = isMobile ? dbMobile : dbDesktop;
@@ -129,3 +135,4 @@ app.get('/', (req, res) => {
 server.listen(80, () => {
     console.log('Server läuft auf http://localhost:80');
 });
+
