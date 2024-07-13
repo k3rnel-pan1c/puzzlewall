@@ -45,10 +45,7 @@
     <script>
         let correctSequence = [];
         let userSequence = [];
-        let startTime;
-        let endTime;
         let puzzleSolved = false;
-        let timerStarted = false;
         let isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
         const socket = io();
@@ -57,27 +54,15 @@
             showLeaderboards();
         });
 
-        function generateSequence() {
-            correctSequence = [];
-            while (correctSequence.length < 4) {
-                const num = Math.floor(Math.random() * 9) + 1;
-                if (!correctSequence.includes(num)) {
-                    correctSequence.push(num);
-                }
-            }
-        }
+        socket.on('start-puzzle', (sequence) => {
+            correctSequence = sequence;
+        });
 
-        function startTimer() {
-            if (!timerStarted) {
-                startTime = new Date().getTime();
-                timerStarted = true;
-            }
+        function startPuzzle() {
+            socket.emit('start-puzzle');
         }
 
         function selectItem(number) {
-            if (!timerStarted) {
-                startTimer();
-            }
             if (puzzleSolved) return; 
 
             const gridItem = document.querySelector(`.grid-item:nth-child(${number})`);
@@ -86,18 +71,15 @@
                 gridItem.classList.add('correct');
                 userSequence.push(number);
                 if (userSequence.length === correctSequence.length) {
-                    endTime = new Date().getTime();
-                    const timeTaken = (endTime - startTime) / 1000;
                     puzzleSolved = true;
-                    document.getElementById('input-section').classList.remove('hidden');
-                    document.getElementById('message').innerText = `Geschafft! Zeit: ${timeTaken} Sekunden. Geben Sie Ihren Namen ein.`;
+                    socket.emit('end-puzzle', userSequence);
                 }
             } else {
                 gridItem.classList.add('incorrect');
                 setTimeout(() => {
                     document.getElementById('message').innerText = "Falsche Reihenfolge. Bitte versuchen Sie es erneut.";
                     resetPuzzle();
-                }, 500);
+                }, 80);
             }
         }
 
@@ -110,37 +92,26 @@
             puzzleSolved = false;
         }
 
+        socket.on('puzzle-solved', (timeTaken) => {
+            document.getElementById('input-section').classList.remove('hidden');
+            document.getElementById('message').innerText = `Geschafft! Zeit: ${timeTaken} Sekunden. Geben Sie Ihren Namen ein.`;
+        });
+
         function submitScore() {
-    const name = document.getElementById('name').value;
-    if (!name) {
-        document.getElementById('message').innerText = "Bitte geben Sie Ihren Namen ein.";
-        return;
-    }
+            const name = document.getElementById('name').value;
+            if (!name) {
+                document.getElementById('message').innerText = "Bitte geben Sie Ihren Namen ein.";
+                return;
+            }
 
-    const timeTaken = (endTime - startTime) / 1000;
+            socket.emit('submit-score', { name, isMobile });
+        }
 
-    fetch('/submit-score', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ name, time: timeTaken, isMobile, startTime, endTime }),
-    })
-    .then(response => response.text())
-    .then(data => {
-        if (data === 'Punktestand gespeichert') {
-            showLeaderboards();
+        socket.on('score-submitted', (message) => {
+            document.getElementById('message').innerText = message;
             document.getElementById('continue-section').classList.remove('hidden');
             document.getElementById('input-section').style.display = 'none'; 
-        } else {
-            document.getElementById('message').innerText = data;
-        }
-    })
-    .catch(error => {
-        document.getElementById('message').innerText = "Fehler beim Speichern des Punktestands.";
-    });
-}
-        
+        });
 
         function showLeaderboards() {
             fetch(`/leaderboard?isMobile=${isMobile}`)
@@ -177,7 +148,7 @@
         }
 
         window.onload = function() {
-            generateSequence();
+            startPuzzle();
             showLeaderboards();
         };
     </script>

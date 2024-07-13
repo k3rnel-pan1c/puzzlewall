@@ -23,52 +23,92 @@ dbDesktop.serialize(() => {
     dbDesktop.run("CREATE TABLE IF NOT EXISTS leaderboard (name TEXT UNIQUE, time REAL)");
 });
 
-app.post('/submit-score', (req, res) => {
-    const { name, time, isMobile, startTime, endTime } = req.body;
+let sequences = {};
+let startTimes = {};
 
-    if (endTime - startTime !== time * 1000 || time <= 0) {
-        return res.status(400).send("Ungültige Zeit");
-    }
+io.on('connection', (socket) => {
+    socket.on('start-puzzle', () => {
+        const sequence = generateSequence();
+        sequences[socket.id] = sequence;
+        startTimes[socket.id] = new Date().getTime();
+        socket.emit('start-puzzle', sequence);
+    });
 
-    const db = isMobile ? dbMobile : dbDesktop;
-    db.get("SELECT time FROM leaderboard WHERE name = ?", [name], (err, row) => {
-        if (err) {
-            return res.status(500).send("Fehler beim Abrufen des Punktestands");
+    socket.on('end-puzzle', (userSequence) => {
+        const endTime = new Date().getTime();
+        const correctSequence = sequences[socket.id];
+        if (JSON.stringify(correctSequence) === JSON.stringify(userSequence)) {
+            const timeTaken = (endTime - startTimes[socket.id]) / 1000;
+            socket.emit('puzzle-solved', timeTaken);
+        } else {
+            socket.emit('puzzle-failed');
         }
-        if (row) {
-            if (time < row.time) {
-                const stmt = db.prepare("UPDATE leaderboard SET time = ? WHERE name = ?");
-                stmt.run(time, name, function(err) {
+    });
+
+    socket.on('submit-score', ({ name, isMobile }) => {
+        const endTime = new Date().getTime();
+        const timeTaken = (endTime - startTimes[socket.id]) / 1000;
+        const db = isMobile ? dbMobile : dbDesktop;
+
+        db.get("SELECT time FROM leaderboard WHERE name = ?", [name], (err, row) => {
+            if (err) {
+                socket.emit('score-submitted', "Fehler beim Abrufen des Punktestands");
+                return;
+            }
+            if (row) {
+                if (timeTaken < row.time) {
+                    const stmt = db.prepare("UPDATE leaderboard SET time = ? WHERE name = ?");
+                    stmt.run(timeTaken, name, function(err) {
+                        if (err) {
+                            socket.emit('score-submitted', "Fehler beim Aktualisieren des Punktestands");
+                            return;
+                        }
+                        finalizeLeaderboard(db, isMobile, () => {
+                            socket.emit('score-submitted', "Punktestand gespeichert");
+                            io.emit('update-leaderboard');
+                        });
+                    });
+                    stmt.finalize();
+                } else {
+                    socket.emit('score-submitted', "Neuer Punktestand ist nicht besser als der bisherige");
+                }
+            } else {
+                const stmt = db.prepare("INSERT INTO leaderboard (name, time) VALUES (?, ?)");
+                stmt.run(name, timeTaken, function(err) {
                     if (err) {
-                        return res.status(500).send("Fehler beim Aktualisieren des Punktestands");
+                        socket.emit('score-submitted', "Fehler beim Speichern des Punktestands");
+                        return;
                     }
-                    finalizeLeaderboard(db, isMobile, res);
+                    finalizeLeaderboard(db, isMobile, () => {
+                        socket.emit('score-submitted', "Punktestand gespeichert");
+                        io.emit('update-leaderboard');
+                    });
                 });
                 stmt.finalize();
-            } else {
-                return res.status(400).send("Neuer Punktestand ist nicht besser als der bisherige");
             }
-        } else {
-            const stmt = db.prepare("INSERT INTO leaderboard (name, time) VALUES (?, ?)");
-            stmt.run(name, time, function(err) {
-                if (err) {
-                    return res.status(500).send("Fehler beim Speichern des Punktestands");
-                }
-                finalizeLeaderboard(db, isMobile, res);
-            });
-            stmt.finalize();
-        }
+        });
     });
 });
 
-function finalizeLeaderboard(db, isMobile, res) {
+function finalizeLeaderboard(db, isMobile, callback) {
     db.run("DELETE FROM leaderboard WHERE rowid NOT IN (SELECT rowid FROM leaderboard ORDER BY time ASC LIMIT 10)", function(err) {
         if (err) {
-            return res.status(500).send("Fehler beim Bereinigen des Leaderboards");
+            console.error("Fehler beim Bereinigen des Leaderboards:", err);
+            return;
         }
-        io.emit('update-leaderboard');
-        res.send("Punktestand gespeichert");
+        callback();
     });
+}
+
+function generateSequence() {
+    const sequence = [];
+    while (sequence.length < 4) {
+        const num = Math.floor(Math.random() * 9) + 1;
+        if (!sequence.includes(num)) {
+            sequence.push(num);
+        }
+    }
+    return sequence;
 }
 
 app.get('/leaderboard', (req, res) => {
