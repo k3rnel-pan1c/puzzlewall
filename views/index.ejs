@@ -41,6 +41,10 @@
             <button class="button" id="continue-button">Weiter zum Inhalt</button>
         </div>
     </div>
+    <div id="tries-container" class="tries-container">
+        <h3>Total mount of runs:</h3>
+        <h3 id="tries" class="tries">0</h3>
+    </div>
     <div id="current-leaderboard" class="leaderboard-container">
         <h3 id="leaderboard-title">Leaderboard</h3>
         <ul id="leaderboard-list" class="leaderboard-list"></ul>
@@ -62,6 +66,10 @@
             const socket = io();
 
             socket.on('update-leaderboard', showLeaderboards);
+
+            socket.on('update-tries',()=> {
+                showTries();
+            });
 
             socket.on('start-puzzle', () => {
                 
@@ -157,6 +165,17 @@
                     });
             }
 
+            function showTries() {
+                fetch('/tries')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('tries').innerText = `${data.tries}`;
+                })
+                .catch((error) => {
+                    console.error('Error:', error);
+                });
+            }
+
             document.getElementById('continue-button').addEventListener('click', () => {
                 window.location.href = "content.html";
             });
@@ -172,6 +191,7 @@
             window.onload = function() {
                 showLeaderboards();
                 getSequence();
+                showTries();
                 document.querySelectorAll('.grid-item').forEach(item => {
                     item.addEventListener('click', selectItem);
                 });
@@ -202,7 +222,7 @@
 
             function enableDarkMode() {
                 document.body.classList.add("dark-mode");
-                document.querySelectorAll('.container, .leaderboard-container, .button, .grid-item').forEach(el => {
+                document.querySelectorAll('.container, .leaderboard-container, .button, .grid-item, .tries-container').forEach(el => {
                     el.classList.add('dark-mode');
                 });
                 localStorage.setItem("darkMode", "enabled");
@@ -210,7 +230,7 @@
 
             function disableDarkMode() {
                 document.body.classList.remove("dark-mode");
-                document.querySelectorAll('.container, .leaderboard-container, .button, .grid-item').forEach(el => {
+                document.querySelectorAll('.container, .leaderboard-container, .button, .grid-item, .tries-container').forEach(el => {
                     el.classList.remove('dark-mode');
                 });
                 localStorage.setItem("darkMode", "disabled");

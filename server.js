@@ -13,6 +13,7 @@ const io = socketIo(server);
 app.set('view engine', 'ejs');
 
 app.use(express.static(path.join(__dirname, 'public')));
+app.use(bodyParser.json());
 
 const generateNonce = () => {
     return crypto.randomBytes(16).toString('base64');
@@ -29,6 +30,7 @@ app.use(bodyParser.json());
 
 const dbMobile = new sqlite3.Database('leaderboard_mobile.db');
 const dbDesktop = new sqlite3.Database('leaderboard_desktop.db');
+const dbTries = new sqlite3.Database('tries.db');
 
 dbMobile.serialize(() => {
     dbMobile.run("CREATE TABLE IF NOT EXISTS leaderboard (name TEXT UNIQUE, time REAL)");
@@ -38,6 +40,11 @@ dbDesktop.serialize(() => {
     dbDesktop.run("CREATE TABLE IF NOT EXISTS leaderboard (name TEXT UNIQUE, time REAL)");
 });
 
+dbTries.serialize(() => {
+    dbTries.run("CREATE TABLE IF NOT EXISTS tries (tries INTEGER)");
+    dbTries.run("INSERT OR IGNORE INTO tries (rowid, tries) VALUES (1, 0)");
+});
+
 let sequences = {};
 let startTimes = {};
 let endTimes = {};
@@ -45,6 +52,21 @@ let endTimes = {};
 io.on('connection', (socket) => {
     socket.on('start-puzzle', () => {
         startTimes[socket.id] = new Date().getTime();
+        const stmt = dbTries.prepare("UPDATE tries SET tries = tries + 1 WHERE rowid = 1");
+        stmt.run(function(err) {
+            if (err) {
+                socket.emit('score-submitted', "Fehler beim Aktualisieren der Tries");
+                return;
+            }
+            dbTries.get("SELECT tries FROM tries WHERE rowid = 1", (err, row) => {
+                if (err) {
+                    socket.emit('score-submitted', "Fehler beim Abrufen der Tries");
+                    return;
+                }
+                io.emit('update-tries', row.tries);
+            });
+        });
+        stmt.finalize();
         socket.emit('start-puzzle');
     });
 
@@ -152,6 +174,15 @@ app.get('/leaderboard', (req, res) => {
             return res.status(500).send("Fehler beim Abrufen des Leaderboards");
         }
         res.json(rows);
+    });
+});
+
+app.get('/tries', (req, res) => {
+    dbTries.get("SELECT tries FROM tries WHERE rowid = 1", (err, row) => {
+        if (err) {
+            return res.status(500).send("Fehler beim Abrufen der tries");
+        }
+        res.json(row);
     });
 });
 

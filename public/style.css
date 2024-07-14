@@ -30,7 +30,7 @@ h1 {
 .container {
     border: 1px solid #ccc;
     padding: 20px;
-    width: 100%;
+    width: 90%;
     max-width: 400px;
     box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
     display: flex;
@@ -44,6 +44,22 @@ h1 {
     max-width: 200px;
     display: flex;
     justify-content: center;
+}
+
+.tries-container {
+    display: flex;
+    border: 1px solid #ccc;
+    padding-left: 20px;
+    padding-right: 20px;
+    width: 90%;
+    max-width: 400px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    text-align: left;
+    flex-direction: row;
+}
+
+.tries {
+    padding-left: 5px;
 }
 
 .leaderboard-container {
@@ -200,7 +216,7 @@ body.dark-mode {
     color: #ffffff;
 }
 
-.container.dark-mode, .leaderboard-container.dark-mode {
+.container.dark-mode, .leaderboard-container.dark-mode, .tries-container.dark-mode {
     background-color: #1e1e1e;
     border: 1px solid #444;
     box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
