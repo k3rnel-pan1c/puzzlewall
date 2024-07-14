@@ -216,6 +216,10 @@
                 localStorage.setItem("darkMode", "disabled");
             }
         });
+
+        socket.on('cheater', () => {
+            document.body.innerHTML = '<div style="color: red; font-size: 48px; text-align: center; margin-top: 20%;">Cheater</div>';
+        });
     </script>
 </body>
 </html>

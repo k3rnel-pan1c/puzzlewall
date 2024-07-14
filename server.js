@@ -43,7 +43,6 @@ io.on('connection', (socket) => {
 
 
     socket.on('end-puzzle', (userSequence) => {
-        console.log(userSequence);
         endTimes[socket.id] = new Date().getTime();
         const correctSequence = sequences[socket.id];
         const hashedUserSequence = userSequence.map(num => hashNum(num.toString()));
@@ -56,13 +55,13 @@ io.on('connection', (socket) => {
     });
 
     socket.on('submit-score', ({ name, isMobile }) => {
-        console.log(endTimes[socket.id]);
         if(endTimes[socket.id] == null){
-            console.log('huos')
-            return
+            socket.emit('cheater');
+            return;
         }
         const timeTaken = (endTimes[socket.id] - startTimes[socket.id]) / 1000;
         if (timeTaken == null) {
+            socket.emit('cheater');
             return;
         }        
         const db = isMobile ? dbMobile : dbDesktop;
