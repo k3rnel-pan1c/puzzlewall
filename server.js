@@ -10,18 +10,14 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
-// Set the view engine to EJS
 app.set('view engine', 'ejs');
 
-// Middleware to serve static files
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Function to generate a nonce
 const generateNonce = () => {
     return crypto.randomBytes(16).toString('base64');
 };
 
-// Middleware to set CSP header with nonce
 app.use((req, res, next) => {
     const nonce = generateNonce();
     res.locals.nonce = nonce;
