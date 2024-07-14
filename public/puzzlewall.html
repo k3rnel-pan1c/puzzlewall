@@ -57,7 +57,7 @@
         let puzzleSolved = false;
         let isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
         let startTime;
-        let timerInterval;
+        let timerStarted = false;
 
         const socket = io();
 
@@ -75,6 +75,10 @@
 
         async function selectItem(number) {
             if (puzzleSolved) return;
+            if (!timerStarted) {
+                startPuzzle();
+                timerStarted = true;
+            }
 
             const gridItem = document.querySelector(`.grid-item:nth-child(${number})`);
             const hashedNumber = await hashNum(number.toString());
@@ -160,7 +164,6 @@
         }
 
         window.onload = function() {
-            startPuzzle();
             showLeaderboards();
         };
 
