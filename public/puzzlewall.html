@@ -65,8 +65,8 @@
             showLeaderboards();
         });
 
-        socket.on('start-puzzle', (sequence) => {
-            correctSequence = sequence;
+        socket.on('start-puzzle', () => {
+            
         });
 
         function startPuzzle() {
@@ -163,8 +163,17 @@
             window.location.href = "content.html";
         }
 
+        function getSequence(){
+            socket.emit('get-sequence')
+        }
+
+        socket.on('get-sequence', (sequence) => {
+            correctSequence = sequence;
+        });
+
         window.onload = function() {
             showLeaderboards();
+            getSequence();
         };
 
         async function hashNum(input) {

@@ -26,21 +26,29 @@ dbDesktop.serialize(() => {
 
 let sequences = {};
 let startTimes = {};
+let endTimes = {};
 
 io.on('connection', (socket) => {
     socket.on('start-puzzle', () => {
+        startTimes[socket.id] = new Date().getTime();
+        socket.emit('start-puzzle');
+    });
+
+    socket.on('get-sequence', () => {
         const sequence = generateSequence();
         sequences[socket.id] = sequence.map(num => hashNum(num.toString()));
         startTimes[socket.id] = new Date().getTime();
-        socket.emit('start-puzzle', sequences[socket.id]);
+        socket.emit('get-sequence', sequences[socket.id]);
     });
 
+
     socket.on('end-puzzle', (userSequence) => {
-        const endTime = new Date().getTime();
+        console.log(userSequence);
+        endTimes[socket.id] = new Date().getTime();
         const correctSequence = sequences[socket.id];
         const hashedUserSequence = userSequence.map(num => hashNum(num.toString()));
         if (JSON.stringify(correctSequence) === JSON.stringify(hashedUserSequence)) {
-            const timeTaken = (endTime - startTimes[socket.id]) / 1000;
+            const timeTaken = (endTimes[socket.id] - startTimes[socket.id]) / 1000;
             socket.emit('puzzle-solved', timeTaken);
         } else {
             socket.emit('puzzle-failed');
@@ -48,8 +56,12 @@ io.on('connection', (socket) => {
     });
 
     socket.on('submit-score', ({ name, isMobile }) => {
-        const endTime = new Date().getTime();
-        const timeTaken = (endTime - startTimes[socket.id]) / 1000;
+        console.log(endTimes[socket.id]);
+        if(endTimes[socket.id] == null){
+            console.log('huos')
+            return
+        }
+        const timeTaken = (endTimes[socket.id] - startTimes[socket.id]) / 1000;
         if (timeTaken == null) {
             return;
         }        
