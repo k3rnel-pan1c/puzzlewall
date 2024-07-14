@@ -50,6 +50,9 @@ io.on('connection', (socket) => {
     socket.on('submit-score', ({ name, isMobile }) => {
         const endTime = new Date().getTime();
         const timeTaken = (endTime - startTimes[socket.id]) / 1000;
+        if (timeTaken == null) {
+            return;
+        }        
         const db = isMobile ? dbMobile : dbDesktop;
 
         db.get("SELECT time FROM leaderboard WHERE name = ?", [name], (err, row) => {
