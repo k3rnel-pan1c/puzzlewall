@@ -55,12 +55,12 @@ io.on('connection', (socket) => {
         const stmt = dbTries.prepare("UPDATE tries SET tries = tries + 1 WHERE rowid = 1");
         stmt.run(function(err) {
             if (err) {
-                socket.emit('score-submitted', "Fehler beim Aktualisieren der Tries");
+                socket.emit('score-submitted', "Error while trying to update trycount");
                 return;
             }
             dbTries.get("SELECT tries FROM tries WHERE rowid = 1", (err, row) => {
                 if (err) {
-                    socket.emit('score-submitted', "Fehler beim Abrufen der Tries");
+                    socket.emit('score-submitted', "error while fetching trycount");
                     return;
                 }
                 io.emit('update-tries', row.tries);
@@ -103,7 +103,7 @@ io.on('connection', (socket) => {
 
         db.get("SELECT time FROM leaderboard WHERE name = ?", [name], (err, row) => {
             if (err) {
-                socket.emit('score-submitted', "Fehler beim Abrufen des Punktestands");
+                socket.emit('score-submitted', "error while fetching time");
                 return;
             }
             if (row) {
@@ -111,27 +111,27 @@ io.on('connection', (socket) => {
                     const stmt = db.prepare("UPDATE leaderboard SET time = ? WHERE name = ?");
                     stmt.run(timeTaken, name, function(err) {
                         if (err) {
-                            socket.emit('score-submitted', "Fehler beim Aktualisieren des Punktestands");
+                            socket.emit('score-submitted', "error while updating time");
                             return;
                         }
                         finalizeLeaderboard(db, isMobile, () => {
-                            socket.emit('score-submitted', "Punktestand gespeichert");
+                            socket.emit('score-submitted', "time saved");
                             io.emit('update-leaderboard');
                         });
                     });
                     stmt.finalize();
                 } else {
-                    socket.emit('score-submitted', "Neuer Punktestand ist nicht besser als der bisherige");
+                    socket.emit('score-submitted', "new time is not better than the old one for that name");
                 }
             } else {
                 const stmt = db.prepare("INSERT INTO leaderboard (name, time) VALUES (?, ?)");
                 stmt.run(name, timeTaken, function(err) {
                     if (err) {
-                        socket.emit('score-submitted', "Fehler beim Speichern des Punktestands");
+                        socket.emit('score-submitted', "error while saving time");
                         return;
                     }
                     finalizeLeaderboard(db, isMobile, () => {
-                        socket.emit('score-submitted', "Punktestand gespeichert");
+                        socket.emit('score-submitted', "time saved");
                         io.emit('update-leaderboard');
                     });
                 });
@@ -144,7 +144,7 @@ io.on('connection', (socket) => {
 function finalizeLeaderboard(db, isMobile, callback) {
     db.run("DELETE FROM leaderboard WHERE rowid NOT IN (SELECT rowid FROM leaderboard ORDER BY time ASC LIMIT 10)", function(err) {
         if (err) {
-            console.error("Fehler beim Bereinigen des Leaderboards:", err);
+            console.error("error while finalizing leaderboard:", err);
             return;
         }
         callback();
@@ -171,7 +171,7 @@ app.get('/leaderboard', (req, res) => {
     const db = isMobile ? dbMobile : dbDesktop;
     db.all("SELECT name, time FROM leaderboard ORDER BY time ASC LIMIT 10", [], (err, rows) => {
         if (err) {
-            return res.status(500).send("Fehler beim Abrufen des Leaderboards");
+            return res.status(500).send("error while fetching leaderboard");
         }
         res.json(rows);
     });
@@ -180,7 +180,7 @@ app.get('/leaderboard', (req, res) => {
 app.get('/tries', (req, res) => {
     dbTries.get("SELECT tries FROM tries WHERE rowid = 1", (err, row) => {
         if (err) {
-            return res.status(500).send("Fehler beim Abrufen der tries");
+            return res.status(500).send("error while fetching trycount");
         }
         res.json(row);
     });
