@@ -97,7 +97,7 @@ io.on('connection', (socket) => {
             return;
         }
         const timeTaken = (endTimes[socket.id] - startTimes[socket.id]) / 1000;
-        if (timeTaken == null) {
+        if (timeTaken == null || timeTaken<0) {
             socket.emit('cheater');
             return;
         }        

@@ -4,11 +4,8 @@ document.addEventListener("DOMContentLoaded", () => {
     let puzzleSolved = false;
     let salt = '';
     let isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-
-    const state = {
-        timerStarted: false,
-        sequenceLocked: false
-    };
+    let timerStarted = false;
+    let sequenceLocked = false;
 
     const socket = io();
 
@@ -28,13 +25,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
     async function selectItem(event) {
         if (puzzleSolved) return;
-        if (!state.timerStarted) {
+        if (!timerStarted) {
             document.querySelectorAll('.tab-item').forEach(item => {
                 item.removeEventListener('click', changeMode);
             });
-            state.timerStarted = true;
-            state.sequenceLocked = true;
-            Object.freeze(state);
+            timerStarted = true;
+            sequenceLocked = true;
             startPuzzle();
         }
 
@@ -46,6 +42,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 userSequence.push(number);
                 if (userSequence.length === correctSequence.length) {
                     puzzleSolved = true;
+                    document.getElementById('reset-button').classList.add('hidden');
                     socket.emit('end-puzzle', {userSequence});
                 }
             } else {
@@ -67,7 +64,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     async function changeMode(event) {
-        if (state.sequenceLocked) {
+        if (sequenceLocked) {
             return;
         }
         const tab = event.target;
@@ -158,10 +155,22 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     socket.on('get-sequence', ({ hashedSequence, salt: receivedSalt }) => {
-        console.log(hashedSequence);
         correctSequence = hashedSequence;
         salt = receivedSalt;
     });
+
+    function reset(){
+        userSequence = [];
+        socket.emit('end-puzzle', {userSequence});
+        sequenceLocked = false;
+        timerStarted = false;
+        document.querySelectorAll('.tab-item').forEach(item => {
+            item.addEventListener('click', changeMode);
+        });
+        getSequence(localStorage.getItem('selectedMode') || '4');
+        resetPuzzle();
+        document.getElementById('message').innerText = "reset sucessfull";
+    }
 
     window.onload = function() {
         showLeaderboards();
@@ -172,6 +181,10 @@ document.addEventListener("DOMContentLoaded", () => {
         document.querySelectorAll('.tab-item').forEach(item => {
             item.addEventListener('click', changeMode);
         });
+        document.getElementById('reset-button').addEventListener('click', reset);
+        if(isMobile){
+            document.getElementById('reset-button').classList.remove('hidden');
+        }
         const savedMode = localStorage.getItem('selectedMode') || '4';
         initializeGame(savedMode);
     };

@@ -60,7 +60,6 @@ h4{
 }
 
 .gamecontainer {
-    padding-bottom: 20px;
     width: 100%;
     max-width: 200px;
     display: flex;
@@ -130,7 +129,7 @@ h4{
     border: none;
 }
 
-.button {
+.button, .reset-button {
     background-color: #3e8e41;
     color: white;
     padding: 10px 15px;
