@@ -24,7 +24,7 @@
             <div class="tab-item" data-mode="6">6</div>
             <div class="tab-item" data-mode="8">8</div>
         </div>
-        <h4 style="padding: 10px;">Solve the following puzzle:</h4>
+        <h4>Solve the following puzzle:</h4>
         <div class="gamecontainer">
             <div class="grid" id="grid">
                 <div class="grid-item" data-number="1"></div>
@@ -67,7 +67,11 @@
             let userSequence = [];
             let puzzleSolved = false;
             let isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-            let timerStarted = false;
+
+            const state = {
+                timerStarted: false,
+                sequenceLocked: false
+            };
 
             const socket = io();
 
@@ -87,11 +91,13 @@
 
             async function selectItem(event) {
                 if (puzzleSolved) return;
-                if (!timerStarted) {
+                if (!state.timerStarted) {
                     document.querySelectorAll('.tab-item').forEach(item => {
                         item.removeEventListener('click', changeMode);
                     });
-                    timerStarted = true;
+                    state.timerStarted = true;
+                    state.sequenceLocked = true;
+                    Object.freeze(state);
                     startPuzzle();
                 }
 
@@ -123,15 +129,21 @@
                 puzzleSolved = false;
             }
 
-            async function changeMode(event){
+            async function changeMode(event) {
+                if (state.sequenceLocked) {
+                    return;
+                }
                 const tab = event.target;
                 const mode = tab.getAttribute('data-mode');
+                getSequence(mode);
                 localStorage.setItem('selectedMode', mode);
+                showLeaderboards();
                 document.querySelectorAll('.tab-item').forEach(tab => tab.classList.remove('active'));
                 tab.classList.add('active');
             }
             
             function initializeGame(mode) {
+                getSequence(mode);
                 document.querySelector(`.tab-item[data-mode="${mode}"]`).classList.add('active');
             }
 
@@ -156,8 +168,8 @@
                 document.getElementById('input-section').classList.add('hidden'); 
             });
 
-            function showLeaderboards() {
-                fetch(`/leaderboard?isMobile=${isMobile}`)
+            async function showLeaderboards() {
+                fetch(`/leaderboard?isMobile=${isMobile}&mode=${localStorage.getItem('selectedMode') || '4'}`)
                     .then(response => response.json())
                     .then(data => {
                         const leaderboardList = document.getElementById('leaderboard-list');
@@ -171,7 +183,7 @@
                         });
                     });
 
-                fetch(`/leaderboard?isMobile=${!isMobile}`)
+                fetch(`/leaderboard?isMobile=${!isMobile}&mode=${localStorage.getItem('selectedMode') || '4'}`)
                     .then(response => response.json())
                     .then(data => {
                         const otherLeaderboardList = document.getElementById('other-leaderboard-list');
@@ -201,8 +213,8 @@
                 window.location.href = "content.html";
             });
 
-            function getSequence() {
-                socket.emit('get-sequence');
+            function getSequence(length) {
+                socket.emit('get-sequence', (length));
             }
 
             socket.on('get-sequence', (sequence) => {
@@ -211,7 +223,6 @@
 
             window.onload = function() {
                 showLeaderboards();
-                getSequence();
                 showTries();
                 document.querySelectorAll('.grid-item').forEach(item => {
                     item.addEventListener('click', selectItem);
@@ -236,7 +247,7 @@
             if (localStorage.getItem("darkMode") === "disabled") {
                 toggleButton.checked = false;
                 enableLightMode();
-            }else{
+            } else {
                 toggleButton.checked = true;
             }
 

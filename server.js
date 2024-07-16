@@ -28,37 +28,34 @@ app.use((req, res, next) => {
 
 app.use(bodyParser.json());
 
-const dbMobile = new sqlite3.Database('leaderboard_mobile.db');
-const dbDesktop = new sqlite3.Database('leaderboard_desktop.db');
-const dbTries = new sqlite3.Database('tries.db');
+const db = new sqlite3.Database('puzzlewall.db');
 
-dbMobile.serialize(() => {
-    dbMobile.run("CREATE TABLE IF NOT EXISTS leaderboard (name TEXT UNIQUE, time REAL)");
-});
-
-dbDesktop.serialize(() => {
-    dbDesktop.run("CREATE TABLE IF NOT EXISTS leaderboard (name TEXT UNIQUE, time REAL)");
-});
-
-dbTries.serialize(() => {
-    dbTries.run("CREATE TABLE IF NOT EXISTS tries (tries INTEGER)");
-    dbTries.run("INSERT OR IGNORE INTO tries (rowid, tries) VALUES (1, 0)");
+db.serialize(() => {
+    db.run("CREATE TABLE IF NOT EXISTS leaderboard_desktop_4 (name TEXT UNIQUE, time REAL)");
+    db.run("CREATE TABLE IF NOT EXISTS leaderboard_desktop_6 (name TEXT UNIQUE, time REAL)");
+    db.run("CREATE TABLE IF NOT EXISTS leaderboard_desktop_8 (name TEXT UNIQUE, time REAL)");
+    db.run("CREATE TABLE IF NOT EXISTS leaderboard_mobile_4 (name TEXT UNIQUE, time REAL)");
+    db.run("CREATE TABLE IF NOT EXISTS leaderboard_mobile_6 (name TEXT UNIQUE, time REAL)");
+    db.run("CREATE TABLE IF NOT EXISTS leaderboard_mobile_8 (name TEXT UNIQUE, time REAL)");
+    db.run("CREATE TABLE IF NOT EXISTS tries (tries INTEGER)");
+    db.run("INSERT OR IGNORE INTO tries (rowid, tries) VALUES (1, 0)");
 });
 
 let sequences = {};
 let startTimes = {};
 let endTimes = {};
+let modes = {};
 
 io.on('connection', (socket) => {
     socket.on('start-puzzle', () => {
         startTimes[socket.id] = new Date().getTime();
-        const stmt = dbTries.prepare("UPDATE tries SET tries = tries + 1 WHERE rowid = 1");
+        const stmt = db.prepare("UPDATE tries SET tries = tries + 1 WHERE rowid = 1");
         stmt.run(function(err) {
             if (err) {
                 socket.emit('score-submitted', "Error while trying to update trycount");
                 return;
             }
-            dbTries.get("SELECT tries FROM tries WHERE rowid = 1", (err, row) => {
+            db.get("SELECT tries FROM tries WHERE rowid = 1", (err, row) => {
                 if (err) {
                     socket.emit('score-submitted', "error while fetching trycount");
                     return;
@@ -70,10 +67,11 @@ io.on('connection', (socket) => {
         socket.emit('start-puzzle');
     });
 
-    socket.on('get-sequence', () => {
-        const sequence = generateSequence();
+    socket.on('get-sequence', (length) => {
+        const sequence = generateSequence(length);
         sequences[socket.id] = sequence.map(num => hashNum(num.toString()));
         startTimes[socket.id] = new Date().getTime();
+        modes[socket.id] = length;
         socket.emit('get-sequence', sequences[socket.id]);
     });
 
@@ -99,22 +97,24 @@ io.on('connection', (socket) => {
             socket.emit('cheater');
             return;
         }        
-        const db = isMobile ? dbMobile : dbDesktop;
+        const mode = modes[socket.id];
+        const device = isMobile ? "mobile" : "desktop";
+        const table = "leaderboard_" + device +"_" + mode;
 
-        db.get("SELECT time FROM leaderboard WHERE name = ?", [name], (err, row) => {
+        db.get("SELECT time FROM " + table + " WHERE name = ?", [name], (err, row) => {
             if (err) {
                 socket.emit('score-submitted', "error while fetching time");
                 return;
             }
             if (row) {
                 if (timeTaken < row.time) {
-                    const stmt = db.prepare("UPDATE leaderboard SET time = ? WHERE name = ?");
+                    const stmt = db.prepare("UPDATE " + table + " SET time = ? WHERE name = ?");
                     stmt.run(timeTaken, name, function(err) {
                         if (err) {
                             socket.emit('score-submitted', "error while updating time");
                             return;
                         }
-                        finalizeLeaderboard(db, isMobile, () => {
+                        finalizeLeaderboard(table, () => {
                             socket.emit('score-submitted', "time saved");
                             io.emit('update-leaderboard');
                         });
@@ -124,13 +124,13 @@ io.on('connection', (socket) => {
                     socket.emit('score-submitted', "new time is not better than the old one for that name");
                 }
             } else {
-                const stmt = db.prepare("INSERT INTO leaderboard (name, time) VALUES (?, ?)");
+                const stmt = db.prepare("INSERT INTO " + table + " (name, time) VALUES (?, ?)");
                 stmt.run(name, timeTaken, function(err) {
                     if (err) {
                         socket.emit('score-submitted', "error while saving time");
                         return;
                     }
-                    finalizeLeaderboard(db, isMobile, () => {
+                    finalizeLeaderboard(table, () => {
                         socket.emit('score-submitted', "time saved");
                         io.emit('update-leaderboard');
                     });
@@ -141,8 +141,8 @@ io.on('connection', (socket) => {
     });
 });
 
-function finalizeLeaderboard(db, isMobile, callback) {
-    db.run("DELETE FROM leaderboard WHERE rowid NOT IN (SELECT rowid FROM leaderboard ORDER BY time ASC LIMIT 10)", function(err) {
+function finalizeLeaderboard(table, callback) {
+    db.run("DELETE FROM " + table + " WHERE rowid NOT IN (SELECT rowid FROM " + table + " ORDER BY time ASC LIMIT 10)", function(err) {
         if (err) {
             console.error("error while finalizing leaderboard:", err);
             return;
@@ -151,9 +151,9 @@ function finalizeLeaderboard(db, isMobile, callback) {
     });
 }
 
-function generateSequence() {
+function generateSequence(length) {
     const sequence = [];
-    while (sequence.length < 4) {
+    while (sequence.length < length) {
         const num = Math.floor(Math.random() * 9) + 1;
         if (!sequence.includes(num)) {
             sequence.push(num);
@@ -168,8 +168,10 @@ function hashNum(input) {
 
 app.get('/leaderboard', (req, res) => {
     const isMobile = req.query.isMobile === 'true';
-    const db = isMobile ? dbMobile : dbDesktop;
-    db.all("SELECT name, time FROM leaderboard ORDER BY time ASC LIMIT 10", [], (err, rows) => {
+    const mode = req.query.mode;
+    const device = isMobile ? "mobile" : "desktop";
+    const table = "leaderboard_" + device +"_" + mode;
+    db.all("SELECT name, time FROM " + table + " ORDER BY time ASC LIMIT 10", [], (err, rows) => {
         if (err) {
             return res.status(500).send("error while fetching leaderboard");
         }
@@ -178,7 +180,7 @@ app.get('/leaderboard', (req, res) => {
 });
 
 app.get('/tries', (req, res) => {
-    dbTries.get("SELECT tries FROM tries WHERE rowid = 1", (err, row) => {
+    db.get("SELECT tries FROM tries WHERE rowid = 1", (err, row) => {
         if (err) {
             return res.status(500).send("error while fetching trycount");
         }
