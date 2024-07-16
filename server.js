@@ -45,6 +45,7 @@ let sequences = {};
 let startTimes = {};
 let endTimes = {};
 let modes = {};
+let salts = {};
 
 io.on('connection', (socket) => {
     socket.on('start-puzzle', () => {
@@ -69,16 +70,19 @@ io.on('connection', (socket) => {
 
     socket.on('get-sequence', (length) => {
         const sequence = generateSequence(length);
-        sequences[socket.id] = sequence.map(num => hashNum(num.toString()));
+        const salt = generateSalt();
+        salts[socket.id] = salt;
+        sequences[socket.id] = sequence.map(num => hashNum(num.toString(), salt));
         startTimes[socket.id] = new Date().getTime();
         modes[socket.id] = length;
-        socket.emit('get-sequence', sequences[socket.id]);
+        socket.emit('get-sequence', { hashedSequence: sequences[socket.id], salt: salt });
     });
 
-    socket.on('end-puzzle', (userSequence) => {
+    socket.on('end-puzzle', ({ userSequence}) => {
         endTimes[socket.id] = new Date().getTime();
+        const salt = salts[socket.id];
         const correctSequence = sequences[socket.id];
-        const hashedUserSequence = userSequence.map(num => hashNum(num.toString()));
+        const hashedUserSequence = userSequence.map(num => hashNum(num.toString(), salt));
         if (JSON.stringify(correctSequence) === JSON.stringify(hashedUserSequence)) {
             const timeTaken = (endTimes[socket.id] - startTimes[socket.id]) / 1000;
             socket.emit('puzzle-solved', timeTaken);
@@ -162,8 +166,12 @@ function generateSequence(length) {
     return sequence;
 }
 
-function hashNum(input) {
-    return crypto.createHash('sha256').update(input.toString()).digest('hex');
+function hashNum(input, salt) {
+    return crypto.createHash('sha256').update(input.toString() + salt).digest('hex');
+}
+
+function generateSalt() {
+    return crypto.randomBytes(16).toString('base64');
 }
 
 app.get('/leaderboard', (req, res) => {
