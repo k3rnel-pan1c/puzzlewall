@@ -1,3 +1,8 @@
+*::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+}
+
 body {
     font-family: Arial, sans-serif;
     text-align: center;
@@ -9,6 +14,7 @@ body {
     background-color: #121212;
     color: #ffffff;
     transition: background-color 0.3s, color 0.3s;
+    overflow: overlay;
 }
 
 * {
