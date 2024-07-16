@@ -11,6 +11,11 @@ body {
     transition: background-color 0.3s, color 0.3s;
 }
 
+* {
+    outline: none;
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+}
+
 .header {
     display: flex;
     align-items: center;
@@ -25,6 +30,13 @@ h1 {
     position: absolute;
     left: 50%;
     transform: translateX(-50%);
+}
+.sequence-header{
+    margin: 0;
+}
+
+h4{
+    margin: 0;
 }
 
 .container {
@@ -46,6 +58,30 @@ h1 {
     max-width: 200px;
     display: flex;
     justify-content: center;
+}
+
+.tabs {
+    display: flex;
+    justify-content: center;
+    padding-top: 10px;
+    padding-bottom: 30px;
+}
+.tab-item {
+    padding: 10px 20px;
+    cursor: pointer;
+    border: 1px solid #444;
+    margin: 0 5px;
+    border-radius: 5px;
+    transition: background-color 0.3s ease, transform 0.3s ease;
+}
+
+.tab-item.active {
+    background-color: #444;
+    transform: scale(1.1);
+}
+
+.tab-item.active.light-mode {
+    background-color: #ccc;
 }
 
 .tries-container {
@@ -222,7 +258,7 @@ body.light-mode {
     color: #000000;
 }
 
-.container.light-mode, .leaderboard-container.light-mode, .tries-container.light-mode {
+.container.light-mode, .leaderboard-container.light-mode, .tries-container.light-mode, .tab-item.light-mode {
     background-color: #ffffff;
     border: 1px solid #ccc;
     box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);

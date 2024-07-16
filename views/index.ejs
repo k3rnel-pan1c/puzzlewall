@@ -18,7 +18,13 @@
     </header>
 
     <div class="container">
-        <h4>Solve the following puzzle:</h4>
+        <h3 class="sequence-header">sequence length</h3>
+        <div class="tabs">
+            <div class="tab-item" data-mode="4">4</div>
+            <div class="tab-item" data-mode="6">6</div>
+            <div class="tab-item" data-mode="8">8</div>
+        </div>
+        <h4 style="padding: 10px;">Solve the following puzzle:</h4>
         <div class="gamecontainer">
             <div class="grid" id="grid">
                 <div class="grid-item" data-number="1"></div>
@@ -82,8 +88,11 @@
             async function selectItem(event) {
                 if (puzzleSolved) return;
                 if (!timerStarted) {
-                    startPuzzle();
+                    document.querySelectorAll('.tab-item').forEach(item => {
+                        item.removeEventListener('click', changeMode);
+                    });
                     timerStarted = true;
+                    startPuzzle();
                 }
 
                 const gridItem = event.target;
@@ -112,6 +121,18 @@
                     item.classList.remove('correct', 'incorrect');
                 });
                 puzzleSolved = false;
+            }
+
+            async function changeMode(event){
+                const tab = event.target;
+                const mode = tab.getAttribute('data-mode');
+                localStorage.setItem('selectedMode', mode);
+                document.querySelectorAll('.tab-item').forEach(tab => tab.classList.remove('active'));
+                tab.classList.add('active');
+            }
+            
+            function initializeGame(mode) {
+                document.querySelector(`.tab-item[data-mode="${mode}"]`).classList.add('active');
             }
 
             socket.on('puzzle-solved', (timeTaken) => {
@@ -195,6 +216,11 @@
                 document.querySelectorAll('.grid-item').forEach(item => {
                     item.addEventListener('click', selectItem);
                 });
+                document.querySelectorAll('.tab-item').forEach(item => {
+                    item.addEventListener('click', changeMode);
+                });
+                const savedMode = localStorage.getItem('selectedMode') || '4';
+                initializeGame(savedMode);
             };
 
             async function hashNum(input) {
@@ -224,7 +250,7 @@
 
             function enableLightMode() {
                 document.body.classList.add("light-mode");
-                document.querySelectorAll('.container, .leaderboard-container, .button, .grid-item, .tries-container').forEach(el => {
+                document.querySelectorAll('.container, .leaderboard-container, .button, .grid-item, .tries-container, .tab-item, .tab-item.active').forEach(el => {
                     el.classList.add('light-mode');
                 });
                 localStorage.setItem("darkMode", "disabled");
@@ -232,7 +258,7 @@
 
             function disableLightMode() {
                 document.body.classList.remove("light-mode");
-                document.querySelectorAll('.container, .leaderboard-container, .button, .grid-item, .tries-container').forEach(el => {
+                document.querySelectorAll('.container, .leaderboard-container, .button, .grid-item, .tries-container, .tab-item, .tab-item.active').forEach(el => {
                     el.classList.remove('light-mode');
                 });
                 localStorage.setItem("darkMode", "enabled");
