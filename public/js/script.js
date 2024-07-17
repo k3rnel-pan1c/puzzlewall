@@ -160,6 +160,9 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     function reset(){
+        if(!sequenceLocked || !timerStarted){
+            return;
+        }
         userSequence = [];
         socket.emit('end-puzzle', {userSequence});
         sequenceLocked = false;
