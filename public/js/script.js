@@ -1,28 +1,67 @@
 document.addEventListener("DOMContentLoaded", () => {
-    let correctSequence = [];
     let userSequence = [];
     let puzzleSolved = false;
-    let salt = '';
     let isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     let timerStarted = false;
     let sequenceLocked = false;
+    let mode = 4;
 
     const socket = io();
+    const toggleButton = document.getElementById('darkModeToggle');
+
+    window.onload = function() {
+        showLeaderboards();
+        showTries();
+        document.querySelectorAll('.tab-item').forEach(item => {
+            item.addEventListener('click', changeMode);
+        });
+        toggleButton.addEventListener("change", toggleDarkMode);
+        document.getElementById('submit-button').addEventListener('click', submitScore);
+        document.getElementById('continue-button').addEventListener('click', () => {
+            window.location.href = "content.html";
+        });
+        document.getElementById('reset-button').addEventListener('click', reset);
+        if (isMobile) {
+            document.getElementById('reset-button').classList.remove('hidden');
+        }
+        const mode = localStorage.getItem('selectedMode') || '4';
+        initializeGame(mode);
+        document.querySelectorAll('.grid-item').forEach(item => {
+            item.addEventListener('click', selectItem);
+        });
+    };
 
     socket.on('update-leaderboard', showLeaderboards);
-
-    socket.on('update-tries',()=> {
-        showTries();
-    });
-
-    socket.on('start-puzzle', () => {
-        
-    });
+    socket.on('update-tries', showTries);
+    socket.on('start-puzzle', () => {});
+    socket.on('puzzle-solved', displayPuzzleSolved);
+    socket.on('score-submitted', displayScoreSubmitted);
+    socket.on('new-sequence', () => {});
+    socket.on('cheater', displayCheaterMessage);
 
     function startPuzzle() {
         socket.emit('start-puzzle');
     }
 
+    function check(number, index) {
+        return new Promise((resolve, reject) => {
+            socket.emit('check-tile', {number, index});
+            
+            socket.once('tile-response', (response) => {
+                resolve(response);
+            });
+    
+            const timeoutId = setTimeout(() => {
+                reject(new Error('Request timed out'));
+            }, 5000);
+    
+            socket.on('error', (error) => {
+                clearTimeout(timeoutId);  
+                reject(error);
+            });
+        });
+    }
+    
     async function selectItem(event) {
         if (puzzleSolved) return;
         if (!timerStarted) {
@@ -31,16 +70,18 @@ document.addEventListener("DOMContentLoaded", () => {
             });
             timerStarted = true;
             sequenceLocked = true;
-            startPuzzle();
+            startPuzzle(new Date().getTime());
         }
-
+    
         const gridItem = event.target;
         const number = gridItem.getAttribute('data-number');
-        hashNum(number.toString(), salt).then(hashedNumber => {
-            if (correctSequence[userSequence.length] === hashedNumber) {
+
+        try {
+            const isCorrect = await check(number, userSequence.length);
+            if (isCorrect) {
                 gridItem.classList.add('correct');
                 userSequence.push(number);
-                if (userSequence.length === correctSequence.length) {
+                if (userSequence.length == mode) {
                     puzzleSolved = true;
                     document.getElementById('reset-button').classList.add('hidden');
                     socket.emit('end-puzzle', {userSequence});
@@ -52,7 +93,9 @@ document.addEventListener("DOMContentLoaded", () => {
                     resetPuzzle();
                 }, 80);
             }
-        });
+        } catch (error) {
+            console.error('Error:', error);
+        }
     }
 
     function resetPuzzle() {
@@ -64,53 +107,55 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     async function changeMode(event) {
-        if (sequenceLocked) {
-            return;
-        }
+        if (sequenceLocked) return;
+
         const tab = event.target;
         const mode = tab.getAttribute('data-mode');
-        if(mode == localStorage.getItem('selectedMode')){
-            return
-        }
-        getSequence(mode);
+        if (mode == localStorage.getItem('selectedMode')) return;
+
+        newSequence(mode);
         localStorage.setItem('selectedMode', mode);
         showLeaderboards();
         document.querySelectorAll('.tab-item').forEach(tab => tab.classList.remove('active'));
         tab.classList.add('active');
     }
-    
+
     function initializeGame(mode) {
-        getSequence(mode);
+        newSequence(mode);
         document.querySelector(`.tab-item[data-mode="${mode}"]`).classList.add('active');
     }
 
-    socket.on('puzzle-solved', (timeTaken) => {
+    function displayPuzzleSolved(timeTaken) {
         document.getElementById('input-section').classList.remove('hidden');
         document.getElementById('message').innerText = `You did it in: ${timeTaken} seconds. Please enter your name.`;
-    });
+    }
 
-    document.getElementById('submit-button').addEventListener('click', () => {
+    function submitScore() {
         const name = document.getElementById('name').value;
         if (!name) {
             document.getElementById('message').innerText = "Please enter your name.";
             return;
         }
-
         socket.emit('submit-score', { name, isMobile });
-    });
+    }
 
-    socket.on('score-submitted', (message) => {
+    function displayScoreSubmitted(message) {
         document.getElementById('message').innerText = message;
         document.getElementById('continue-section').classList.remove('hidden');
-        document.getElementById('input-section').classList.add('hidden'); 
-    });
+        document.getElementById('input-section').classList.add('hidden');
+    }
 
     async function showLeaderboards() {
+        fetchLeaderboard(isMobile, 'leaderboard-list', 'leaderboard-title');
+        fetchLeaderboard(!isMobile, 'other-leaderboard-list', 'other-leaderboard-title');
+    }
+
+    function fetchLeaderboard(isMobile, listId, titleId) {
         fetch(`/leaderboard?isMobile=${isMobile}&mode=${localStorage.getItem('selectedMode') || '4'}`)
             .then(response => response.json())
             .then(data => {
-                const leaderboardList = document.getElementById('leaderboard-list');
-                const leaderboardTitle = document.getElementById('leaderboard-title');
+                const leaderboardList = document.getElementById(listId);
+                const leaderboardTitle = document.getElementById(titleId);
                 leaderboardTitle.textContent = isMobile ? "Mobile Leaderboard" : "Desktop Leaderboard";
                 leaderboardList.innerHTML = '';
                 data.forEach((entry, index) => {
@@ -119,88 +164,44 @@ document.addEventListener("DOMContentLoaded", () => {
                     leaderboardList.appendChild(listItem);
                 });
             });
-
-        fetch(`/leaderboard?isMobile=${!isMobile}&mode=${localStorage.getItem('selectedMode') || '4'}`)
-            .then(response => response.json())
-            .then(data => {
-                const otherLeaderboardList = document.getElementById('other-leaderboard-list');
-                const otherLeaderboardTitle = document.getElementById('other-leaderboard-title');
-                otherLeaderboardTitle.textContent = !isMobile ? "Mobile Leaderboard" : "Desktop Leaderboard";
-                otherLeaderboardList.innerHTML = '';
-                data.forEach((entry, index) => {
-                    const listItem = document.createElement('li');
-                    listItem.textContent = `${index + 1}. ${entry.name}: ${entry.time} Seconds`;
-                    otherLeaderboardList.appendChild(listItem);
-                });
-            });
     }
 
     function showTries() {
         fetch('/tries')
-        .then(response => response.json())
-        .then(data => {
-            document.getElementById('tries').innerText = `${data.tries}`;
-        })
-        .catch((error) => {
-            console.error('Error:', error);
-        });
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('tries').innerText = `${data.tries}`;
+            })
+            .catch((error) => {
+                console.error('Error:', error);
+            });
     }
 
-    document.getElementById('continue-button').addEventListener('click', () => {
-        window.location.href = "content.html";
-    });
-
-    function getSequence(length) {
-        socket.emit('get-sequence', (length));
+    function newSequence(length) {
+        socket.emit('new-sequence', length);
     }
 
-    socket.on('get-sequence', ({ hashedSequence, salt: receivedSalt }) => {
-        correctSequence = hashedSequence;
-        salt = receivedSalt;
-    });
-
-    function reset(){
-        if(!sequenceLocked || !timerStarted){
-            return;
-        }
+    function reset() {
+        if (!sequenceLocked || !timerStarted) return;
         userSequence = [];
-        socket.emit('end-puzzle', {userSequence});
+        socket.emit('end-puzzle', { userSequence });
         sequenceLocked = false;
         timerStarted = false;
         document.querySelectorAll('.tab-item').forEach(item => {
             item.addEventListener('click', changeMode);
         });
-        getSequence(localStorage.getItem('selectedMode') || '4');
+        newSequence(localStorage.getItem('selectedMode') || '4');
         resetPuzzle();
-        document.getElementById('message').innerText = "reset sucessfull";
+        document.getElementById('message').innerText = "reset successful";
     }
 
-    window.onload = function() {
-        showLeaderboards();
-        showTries();
-        document.querySelectorAll('.grid-item').forEach(item => {
-            item.addEventListener('click', selectItem);
-        });
-        document.querySelectorAll('.tab-item').forEach(item => {
-            item.addEventListener('click', changeMode);
-        });
-        document.getElementById('reset-button').addEventListener('click', reset);
-        if(isMobile){
-            document.getElementById('reset-button').classList.remove('hidden');
+    function toggleDarkMode() {
+        if (toggleButton.checked) {
+            disableLightMode();
+        } else {
+            enableLightMode();
         }
-        const savedMode = localStorage.getItem('selectedMode') || '4';
-        initializeGame(savedMode);
-    };
-
-    async function hashNum(input, salt) {
-        const encoder = new TextEncoder();
-        const data = encoder.encode(input + salt);
-        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-        const hashArray = Array.from(new Uint8Array(hashBuffer));
-        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
     }
-
-    const toggleButton = document.getElementById('darkModeToggle');
 
     if (localStorage.getItem("darkMode") === "disabled") {
         toggleButton.checked = false;
@@ -208,14 +209,6 @@ document.addEventListener("DOMContentLoaded", () => {
     } else {
         toggleButton.checked = true;
     }
-
-    toggleButton.addEventListener("change", () => {
-        if (toggleButton.checked) {
-            disableLightMode();
-        } else {
-            enableLightMode();
-        }
-    });
 
     function enableLightMode() {
         document.body.classList.add("light-mode");
@@ -233,7 +226,7 @@ document.addEventListener("DOMContentLoaded", () => {
         localStorage.setItem("darkMode", "enabled");
     }
 
-    socket.on('cheater', () => {
+    function displayCheaterMessage() {
         document.body.innerHTML = '<div style="color: red; font-size: 48px; text-align: center; margin-top: 20%;">Cheater</div>';
-    });
+    }
 });

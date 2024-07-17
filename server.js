@@ -68,28 +68,47 @@ io.on('connection', (socket) => {
         socket.emit('start-puzzle');
     });
 
-    socket.on('get-sequence', (length) => {
+    socket.on('new-sequence', (length) => {
         const sequence = generateSequence(length);
-        const salt = generateSalt();
-        salts[socket.id] = salt;
-        sequences[socket.id] = sequence.map(num => hashNum(num.toString(), salt));
+        sequences[socket.id] = sequence;
         startTimes[socket.id] = new Date().getTime();
         modes[socket.id] = length;
-        socket.emit('get-sequence', { hashedSequence: sequences[socket.id], salt: salt });
     });
 
-    socket.on('end-puzzle', ({ userSequence}) => {
-        endTimes[socket.id] = new Date().getTime();
-        const salt = salts[socket.id];
-        const correctSequence = sequences[socket.id];
-        const hashedUserSequence = userSequence.map(num => hashNum(num.toString(), salt));
-        if (JSON.stringify(correctSequence) === JSON.stringify(hashedUserSequence)) {
+    socket.on('end-puzzle', ({userSequence}) => {
+        const uSequence = userSequence.map(Number);        
+
+        const correctSequence = sequences[socket.id];        
+
+        const arraysEqual = (arr1, arr2) => {
+            if (arr1.length !== arr2.length) return false;
+            for (let i = 0; i < arr1.length; i++) {
+                if (arr1[i] !== arr2[i]) return false;
+            }
+            return true;
+        };
+    
+        if (arraysEqual(correctSequence, uSequence)) {
             const timeTaken = (endTimes[socket.id] - startTimes[socket.id]) / 1000;
             socket.emit('puzzle-solved', timeTaken);
         } else {
             socket.emit('puzzle-failed');
         }
     });
+    
+
+    socket.on('check-tile', ({number, index}) => {
+        if(index === modes[socket.id]-1){
+            endTimes[socket.id] = new Date().getTime();
+        }
+    
+        let correct = false;
+        if(sequences[socket.id][index] == number){
+            correct = true;
+        }
+        socket.emit('tile-response', correct);
+    });
+    
 
     socket.on('submit-score', ({ name, isMobile }) => {
         if(endTimes[socket.id] == null){
@@ -164,14 +183,6 @@ function generateSequence(length) {
         }
     }
     return sequence;
-}
-
-function hashNum(input, salt) {
-    return crypto.createHash('sha256').update(input.toString() + salt).digest('hex');
-}
-
-function generateSalt() {
-    return crypto.randomBytes(16).toString('base64');
 }
 
 app.get('/leaderboard', (req, res) => {
