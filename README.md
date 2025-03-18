@@ -2,4 +2,4 @@
 
 Puzzlewall is a web-based puzzle game where users solve a puzzle to access the content of a website. 
 ### Demo
-[saucysalad.de](https://saucysalad.de)
+[puzzlewall]([https://saucysalad.de](https://puzzlewall.k3rnelpan1c.com/))
